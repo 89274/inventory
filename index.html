@@ -2,75 +2,96 @@
 <html lang="zh-TW">
 <head>
   <meta charset="utf-8">
-  <title>雲端即時庫存管理系統</title>
+  <title>雲端即時庫存管理系統 (批量作業版)</title>
   <style>
     * { box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft JhengHei", sans-serif; background: #f8fafc; padding: 20px; color: #1e293b; max-width: 1000px; margin: 0 auto; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft JhengHei", sans-serif; background: #f8fafc; padding: 20px; color: #1e293b; max-width: 1100px; margin: 0 auto; }
     .box { background: #fff; padding: 18px; border-radius: 8px; border: 1px solid #cbd5e1; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
     h2, h3 { margin-top: 0; color: #0f172a; }
-    .btn { padding: 9px 16px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; transition: 0.15s; }
+    .btn { padding: 8px 14px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px; transition: 0.15s; }
     .btn:hover { opacity: 0.9; }
     .btn-blue { background: #2563eb; color: #fff; }
     .btn-green { background: #16a34a; color: #fff; }
     .btn-gray { background: #64748b; color: #fff; }
+    .btn-red { background: #ef4444; color: #fff; }
     .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-    input, select { padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; outline: none; }
-    table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
-    th, td { padding: 12px 10px; border-bottom: 1px solid #e2e8f0; text-align: left; }
+    input, select, textarea { padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; outline: none; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+    th, td { padding: 10px 8px; border-bottom: 1px solid #e2e8f0; text-align: left; }
     th { background: #f8fafc; color: #475569; }
-    .tag { padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 12px; }
+    .tag { padding: 3px 6px; border-radius: 4px; font-weight: bold; font-size: 12px; }
     .tag-low { background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; }
     .tag-ok { background: #f1f5f9; color: #334155; }
-    #loading-mask { display: none; color: #2563eb; font-weight: bold; margin-left: 10px; }
+    .batch-input { width: 100%; border: 1px solid #e2e8f0; padding: 6px; }
+    .hint { font-size: 12px; color: #64748b; margin-top: 4px; }
   </style>
 </head>
 <body>
 
+  <!-- 頂部狀態列 -->
   <div class="box" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
     <div>
-      <h2 style="margin: 0;">雲端庫存系統 (Google 試算表驅動)</h2>
-      <div style="font-size: 13px; color: #16a34a; font-weight: bold; margin-top: 4px;">
-        ● 資料庫連線中 <span id="loading-mask">⏳ 處理中...</span>
+      <h2 style="margin: 0;">雲端庫存系統 (支援多筆批量作業)</h2>
+      <div id="status-text" style="font-size: 13px; color: #16a34a; font-weight: bold; margin-top: 4px;">● 資料庫已就緒</div>
+    </div>
+    <button class="btn btn-gray" onclick="window.loadData()">重新整理清單</button>
+  </div>
+
+  <!-- 1. 批量新增料號主檔 -->
+  <div class="box" style="border-left: 4px solid #2563eb;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <h3 style="color: #1d4ed8; margin: 0;">1. 批量新增品項料號主檔</h3>
+      <div>
+        <button class="btn btn-gray" onclick="window.addBatchItemRow()">+ 加一列</button>
+        <button class="btn btn-blue" id="btn-batch-save" onclick="window.saveBatchItems()">確認批量新增</button>
       </div>
     </div>
-    <button class="btn btn-gray" onclick="window.loadData()">重新整理</button>
+    <div class="hint">支援從 Excel 複製多行（格式：料號 品名 初始庫存 安全水位）貼到第一格會自動展開。</div>
+    <table id="table-batch-add">
+      <thead>
+        <tr>
+          <th style="width: 25%;">料號 (SKU)</th>
+          <th style="width: 40%;">品名規格</th>
+          <th style="width: 15%;">初始庫存</th>
+          <th style="width: 15%;">安全水位</th>
+          <th style="width: 5%;">刪除</th>
+        </tr>
+      </thead>
+      <tbody id="tbody-batch-add"></tbody>
+    </table>
   </div>
 
-  <!-- 1. 新增料號 -->
-  <div class="box" style="border-left: 4px solid #2563eb;">
-    <h3 style="color: #1d4ed8; margin-bottom: 10px;">1. 新增品項料號</h3>
-    <div class="row">
-      <input type="text" id="add-sku" placeholder="料號 (例: P-1001)">
-      <input type="text" id="add-name" placeholder="品名規格 (例: 馬達 24V)">
-      <input type="number" id="add-stock" placeholder="初始庫存" value="0" style="width: 100px;">
-      <input type="number" id="add-min" placeholder="安全庫存" value="10" style="width: 100px;">
-      <button class="btn btn-blue" id="btn-save" onclick="window.saveItem()">儲存此品項</button>
-    </div>
-  </div>
-
-  <!-- 2. 進出庫作業 -->
+  <!-- 2. 批量進出庫登記 -->
   <div class="box" style="border-left: 4px solid #16a34a;">
-    <h3 style="color: #15803d; margin-bottom: 10px;">2. 進出庫作業登記</h3>
-    <div class="row">
-      <select id="op-sku">
-        <option value="">-- 請先選擇料號 --</option>
-      </select>
-      <select id="op-type">
-        <option value="IN">進貨入庫 (+)</option>
-        <option value="OUT">領料出庫 (-)</option>
-      </select>
-      <input type="number" id="op-qty" placeholder="數量" value="1" min="1" style="width: 80px;">
-      <input type="text" id="op-user" placeholder="經辦人" value="現場人員" style="width: 100px;">
-      <input type="text" id="op-note" placeholder="單號/備註">
-      <button class="btn btn-green" id="btn-exec" onclick="window.execStock()">確認執行</button>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <h3 style="color: #15803d; margin: 0;">2. 批量進出庫作業登記</h3>
+      <div>
+        <button class="btn btn-gray" onclick="window.addBatchOpRow()">+ 加一列</button>
+        <button class="btn btn-green" id="btn-batch-op" onclick="window.execBatchStock()">確認批量送出</button>
+      </div>
     </div>
+    <div class="row" style="margin-top: 10px;">
+      <label>批次經手人: <input type="text" id="batch-op-user" value="現場人員" style="width: 120px;"></label>
+      <label>批次備註/工單號: <input type="text" id="batch-op-note" placeholder="例如: MO-20261012" style="width: 200px;"></label>
+    </div>
+    <table id="table-batch-op">
+      <thead>
+        <tr>
+          <th style="width: 45%;">選擇料號</th>
+          <th style="width: 25%;">類型</th>
+          <th style="width: 20%;">數量</th>
+          <th style="width: 10%;">刪除</th>
+        </tr>
+      </thead>
+      <tbody id="tbody-batch-op"></tbody>
+    </table>
   </div>
 
   <!-- 3. 在庫清單 -->
   <div class="box">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
       <h3 style="margin: 0;">3. 在庫清單</h3>
-      <input type="text" id="search-box" oninput="window.filterItems()" placeholder="搜尋料號或品名..." style="width: 200px;">
+      <input type="text" id="search-box" oninput="window.filterItems()" placeholder="搜尋料號或品名..." style="width: 220px;">
     </div>
     <table>
       <thead>
@@ -79,18 +100,18 @@
           <th>品名</th>
           <th>安全水位</th>
           <th>目前庫存</th>
-          <th style="text-align: right;">快速操作</th>
+          <th style="text-align: right;">快速動作</th>
         </tr>
       </thead>
       <tbody id="tb">
-        <tr><td colspan="5" style="text-align:center; padding: 25px; color: #94a3b8;">正在讀取資料...</td></tr>
+        <tr><td colspan="5" style="text-align:center; padding: 25px; color: #94a3b8;">讀取中...</td></tr>
       </tbody>
     </table>
   </div>
 
   <!-- 4. 最新紀錄 -->
   <div class="box">
-    <h3 style="margin-bottom: 10px;">4. 最新出入庫紀錄</h3>
+    <h3 style="margin-bottom: 10px;">4. 最新出入庫紀錄 (前 25 筆)</h3>
     <div id="logs" style="font-size: 13px; line-height: 1.8; color: #475569;">
       尚無紀錄
     </div>
@@ -102,41 +123,83 @@
 
     var itemList = [];
 
-    function setBusy(busy) {
-      var mask = document.getElementById('loading-mask');
-      if (mask) mask.style.display = busy ? 'inline' : 'none';
-    }
-
-    window.chooseSku = function(sku) {
-      var sel = document.getElementById('op-sku');
-      if (sel) {
-        sel.value = sku;
-        sel.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
+    // ====== 批量表格 UI 產生 ======
+    window.addBatchItemRow = function(sku, name, stock, min) {
+      var tbody = document.getElementById('tbody-batch-add');
+      var tr = document.createElement('tr');
+      tr.innerHTML = 
+        '<td><input type="text" class="batch-input b-add-sku" value="' + (sku || '') + '" placeholder="例: P-1001"></td>' +
+        '<td><input type="text" class="batch-input b-add-name" value="' + (name || '') + '" placeholder="例: 滾珠軸承 608ZZ"></td>' +
+        '<td><input type="number" class="batch-input b-add-stock" value="' + (stock !== undefined ? stock : 0) + '"></td>' +
+        '<td><input type="number" class="batch-input b-add-min" value="' + (min !== undefined ? min : 10) + '"></td>' +
+        '<td><button class="btn btn-red" style="padding: 4px 8px;" onclick="this.closest(\'tr\').remove()">✕</button></td>';
+      tbody.appendChild(tr);
     };
 
-    window.filterItems = function() {
-      var kw = document.getElementById('search-box').value.toLowerCase();
-      var filtered = itemList.filter(function(i) {
-        return (i.sku || '').toLowerCase().indexOf(kw) > -1 || (i.name || '').toLowerCase().indexOf(kw) > -1;
+    window.addBatchOpRow = function(targetSku, defaultType) {
+      var tbody = document.getElementById('tbody-batch-op');
+      var tr = document.createElement('tr');
+      
+      var options = '<option value="">-- 請選擇料號 --</option>';
+      itemList.forEach(function(i) {
+        var sel = (targetSku && i.sku === targetSku) ? 'selected' : '';
+        options += '<option value="' + i.sku + '" ' + sel + '>' + i.sku + ' - ' + i.name + ' (現有: ' + i.stock + ')</option>';
       });
-      renderTable(filtered);
+
+      tr.innerHTML = 
+        '<td><select class="batch-input b-op-sku">' + options + '</select></td>' +
+        '<td><select class="batch-input b-op-type">' +
+          '<option value="IN" ' + (defaultType === 'IN' ? 'selected' : '') + '>進貨入庫 (+)</option>' +
+          '<option value="OUT" ' + (defaultType === 'OUT' ? 'selected' : '') + '>領料出庫 (-)</option>' +
+        '</select></td>' +
+        '<td><input type="number" class="batch-input b-op-qty" value="1" min="1"></td>' +
+        '<td><button class="btn btn-red" style="padding: 4px 8px;" onclick="this.closest(\'tr\').remove()">✕</button></td>';
+      tbody.appendChild(tr);
+    };
+
+    // 支援 Excel 貼上自動解析多列
+    document.getElementById('tbody-batch-add').addEventListener('paste', function(e) {
+      var clipboardData = e.clipboardData || window.clipboardData;
+      var pastedData = clipboardData.getData('Text');
+      if (pastedData && pastedData.indexOf('\t') > -1) {
+        e.preventDefault();
+        var rows = pastedData.trim().split('\n');
+        rows.forEach(function(r) {
+          var cols = r.split('\t');
+          if (cols[0]) {
+            window.addBatchItemRow(cols[0].trim(), (cols[1] || '').trim(), cols[2] || 0, cols[3] || 10);
+          }
+        });
+      }
+    });
+
+    // ====== 資料載入 ======
+    window.loadData = function() {
+      document.getElementById('status-text').innerText = '● 資料同步中...';
+      fetch(GAS_URL + '?action=getItems&t=' + Date.now(), { method: 'GET', redirect: 'follow' })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          itemList = data || [];
+          renderTable(itemList);
+          document.getElementById('status-text').innerText = '● 資料庫已就緒';
+        })
+        .catch(function(err) {
+          document.getElementById('tb').innerHTML = '<tr><td colspan="5" style="color:red; text-align:center;">讀取失敗：' + err.message + '</td></tr>';
+        });
+
+      fetch(GAS_URL + '?action=getLogs&t=' + Date.now(), { method: 'GET', redirect: 'follow' })
+        .then(function(res) { return res.json(); })
+        .then(function(logs) {
+          renderLogs(logs || []);
+        });
     };
 
     function renderTable(data) {
       var tb = document.getElementById('tb');
-      var sel = document.getElementById('op-sku');
-
-      sel.innerHTML = '<option value="">-- 請先選擇料號 --</option>';
-      itemList.forEach(function(i) {
-        sel.innerHTML += '<option value="' + i.sku + '">' + i.sku + ' - ' + i.name + ' (在庫: ' + i.stock + ')</option>';
-      });
-
       if (!data || data.length === 0) {
-        tb.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 25px; color: #94a3b8;">目前尚無品項資料，請在上方區塊 1 新增。</td></tr>';
+        tb.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 25px; color: #94a3b8;">目前尚無品項資料。</td></tr>';
         return;
       }
-
       var h = '';
       data.forEach(function(i) {
         var isLow = Number(i.stock) <= Number(i.min_stock);
@@ -146,7 +209,8 @@
           '<td style="color: #64748b;">' + i.min_stock + '</td>' +
           '<td><span class="tag ' + (isLow ? 'tag-low' : 'tag-ok') + '">' + i.stock + '</span></td>' +
           '<td style="text-align: right;">' +
-            '<button class="btn btn-gray" style="padding: 4px 10px; font-size: 12px;" onclick="window.chooseSku(\'' + i.sku + '\')">帶入登記</button>' +
+            '<button class="btn btn-gray" style="padding: 3px 8px; font-size: 11px; margin-right: 4px;" onclick="window.addBatchOpRow(\'' + i.sku + '\', \'IN\')">+入庫列</button>' +
+            '<button class="btn btn-gray" style="padding: 3px 8px; font-size: 11px;" onclick="window.addBatchOpRow(\'' + i.sku + '\', \'OUT\')">-出庫列</button>' +
           '</td>' +
         '</tr>';
       });
@@ -156,7 +220,7 @@
     function renderLogs(logs) {
       var box = document.getElementById('logs');
       if (!logs || logs.length === 0) {
-        box.innerHTML = '尚無出入庫異動紀錄';
+        box.innerHTML = '尚無紀錄';
         return;
       }
       var h = '';
@@ -171,119 +235,118 @@
       box.innerHTML = h;
     }
 
-    window.loadData = function() {
-      setBusy(true);
-      fetch(GAS_URL + '?action=getItems&t=' + Date.now(), { method: 'GET', redirect: 'follow' })
-        .then(function(res) { return res.json(); })
-        .then(function(data) {
-          itemList = data || [];
-          renderTable(itemList);
-        })
-        .catch(function(err) {
-          document.getElementById('tb').innerHTML = '<tr><td colspan="5" style="color:#dc2626; text-align:center; font-weight:bold;">讀取品項失敗：' + err.message + '</td></tr>';
-        });
-
-      fetch(GAS_URL + '?action=getLogs&t=' + Date.now(), { method: 'GET', redirect: 'follow' })
-        .then(function(res) { return res.json(); })
-        .then(function(logs) {
-          renderLogs(logs || []);
-        })
-        .finally(function() {
-          setBusy(false);
-        });
+    window.filterItems = function() {
+      var kw = document.getElementById('search-box').value.toLowerCase();
+      var filtered = itemList.filter(function(i) {
+        return (i.sku || '').toLowerCase().indexOf(kw) > -1 || (i.name || '').toLowerCase().indexOf(kw) > -1;
+      });
+      renderTable(filtered);
     };
 
-    window.saveItem = function() {
-      var sku = document.getElementById('add-sku').value.trim();
-      var name = document.getElementById('add-name').value.trim();
-      var stock = parseInt(document.getElementById('add-stock').value) || 0;
-      var min_stock = parseInt(document.getElementById('add-min').value) || 0;
+    // ====== 批量送出：新增品項 ======
+    window.saveBatchItems = function() {
+      var rows = document.querySelectorAll('#tbody-batch-add tr');
+      var items = [];
+      rows.forEach(function(r) {
+        var sku = r.querySelector('.b-add-sku').value.trim();
+        var name = r.querySelector('.b-add-name').value.trim();
+        var stock = parseInt(r.querySelector('.b-add-stock').value) || 0;
+        var min_stock = parseInt(r.querySelector('.b-add-min').value) || 0;
+        if (sku && name) {
+          items.push({ sku: sku, name: name, stock: stock, min_stock: min_stock });
+        }
+      });
 
-      if (!sku || !name) {
-        alert('請填寫料號與品名！');
-        return;
-      }
+      if (items.length === 0) return alert('請先填寫至少一筆完整料號與品名！');
 
-      var btn = document.getElementById('btn-save');
+      var btn = document.getElementById('btn-batch-save');
       btn.innerText = '處理中...';
       btn.disabled = true;
-      setBusy(true);
 
       fetch(GAS_URL, {
         method: 'POST',
         redirect: 'follow',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'addItem', sku: sku, name: name, stock: stock, min_stock: min_stock })
+        body: JSON.stringify({ action: 'batchAddItems', items: items })
       })
       .then(function(res) { return res.json(); })
       .then(function(data) {
-        if (data.error) {
-          alert(data.error);
-        } else {
-          alert('品項新增成功！');
-          document.getElementById('add-sku').value = '';
-          document.getElementById('add-name').value = '';
-          window.loadData();
+        var msg = '成功新增 ' + data.addedCount + ' 筆品項！';
+        if (data.skipped && data.skipped.length > 0) {
+          msg += '\n略過已存在的料號：' + data.skipped.join(', ');
         }
+        alert(msg);
+        document.getElementById('tbody-batch-add').innerHTML = '';
+        window.initRows();
+        window.loadData();
       })
       .catch(function(err) {
         alert('儲存失敗：' + err.message);
       })
       .finally(function() {
-        btn.innerText = '儲存此品項';
+        btn.innerText = '確認批量新增';
         btn.disabled = false;
-        setBusy(false);
       });
     };
 
-    window.execStock = function() {
-      var sku = document.getElementById('op-sku').value;
-      var type = document.getElementById('op-type').value;
-      var quantity = parseInt(document.getElementById('op-qty').value) || 0;
-      var operator = document.getElementById('op-user').value.trim();
-      var note = document.getElementById('op-note').value.trim();
+    // ====== 批量送出：進出庫 ======
+    window.execBatchStock = function() {
+      var rows = document.querySelectorAll('#tbody-batch-op tr');
+      var ops = [];
+      rows.forEach(function(r) {
+        var sku = r.querySelector('.b-op-sku').value;
+        var type = r.querySelector('.b-op-type').value;
+        var qty = parseInt(r.querySelector('.b-op-qty').value) || 0;
+        if (sku && qty > 0) {
+          ops.push({ sku: sku, type: type, quantity: qty });
+        }
+      });
 
-      if (!sku) {
-        alert('請先選擇料號！');
-        return;
-      }
-      if (quantity <= 0) {
-        alert('數量必須大於 0！');
-        return;
-      }
+      if (ops.length === 0) return alert('請先選擇料號並填寫正確數量！');
 
-      var btn = document.getElementById('btn-exec');
+      var user = document.getElementById('batch-op-user').value.trim();
+      var note = document.getElementById('batch-op-note').value.trim();
+
+      var btn = document.getElementById('btn-batch-op');
       btn.innerText = '處理中...';
       btn.disabled = true;
-      setBusy(true);
 
       fetch(GAS_URL, {
         method: 'POST',
         redirect: 'follow',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'execStock', sku: sku, type: type, quantity: quantity, operator: operator, note: note })
+        body: JSON.stringify({ action: 'batchExecStock', operations: ops, operator: user, note: note })
       })
       .then(function(res) { return res.json(); })
       .then(function(data) {
-        if (data.error) {
-          alert(data.error);
-        } else {
-          alert('出入庫登記完成！');
-          document.getElementById('op-note').value = '';
-          window.loadData();
+        var msg = '成功執行 ' + data.count + ' 筆進出庫作業！';
+        if (data.failed && data.failed.length > 0) {
+          msg += '\n失敗項目：\n' + data.failed.join('\n');
         }
+        alert(msg);
+        document.getElementById('tbody-batch-op').innerHTML = '';
+        window.initOpRows();
+        window.loadData();
       })
       .catch(function(err) {
         alert('作業失敗：' + err.message);
       })
       .finally(function() {
-        btn.innerText = '確認執行';
+        btn.innerText = '確認批量送出';
         btn.disabled = false;
-        setBusy(false);
       });
     };
 
-    // 啟動資料載入
+    // 初始化預設帶入 3 列輸入框
+    window.initRows = function() {
+      for (var i = 0; i < 3; i++) window.addBatchItemRow();
+    };
+    window.initOpRows = function() {
+      for (var i = 0; i < 2; i++) window.addBatchOpRow();
+    };
+
+    window.initRows();
+    window.initOpRows();
     window.loadData();
   </script>
 </body>
