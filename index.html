@@ -30,9 +30,9 @@
   <div class="box" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
     <div>
       <h2 style="margin: 0;">雲端即時庫存管理系統</h2>
-      <div id="status-text" style="font-size: 13px; color: #16a34a; font-weight: bold; margin-top: 4px;">● 系統就緒</div>
+      <div id="status-text" style="font-size: 13px; color: #16a34a; font-weight: bold; margin-top: 4px;">● 連線準備中...</div>
     </div>
-    <button class="btn btn-gray" id="btn-refresh">重新整理資料</button>
+    <button class="btn btn-gray" onclick="loadData()">重新整理資料</button>
   </div>
 
   <!-- 區塊 1：新增料號表單 -->
@@ -43,7 +43,7 @@
       <input type="text" id="add-name" placeholder="品名規格 (例: 滾珠軸承)">
       <input type="number" id="add-stock" placeholder="初始庫存" value="0" style="width: 100px;">
       <input type="number" id="add-min" placeholder="安全庫存" value="10" style="width: 100px;">
-      <button class="btn btn-blue" id="btn-save">儲存此品項</button>
+      <button class="btn btn-blue" id="btn-save" onclick="saveItem()">儲存此品項</button>
     </div>
   </div>
 
@@ -61,7 +61,7 @@
       <input type="number" id="op-qty" placeholder="數量" value="1" min="1" style="width: 80px;">
       <input type="text" id="op-user" placeholder="經辦人" value="現場人員" style="width: 110px;">
       <input type="text" id="op-note" placeholder="工單 / 備註單號">
-      <button class="btn btn-green" id="btn-exec">確認執行</button>
+      <button class="btn btn-green" id="btn-exec" onclick="execStock()">確認執行</button>
     </div>
   </div>
 
@@ -69,7 +69,7 @@
   <div class="box">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
       <h3 style="margin: 0;">3. 在庫清單</h3>
-      <input type="text" id="search-box" placeholder="搜尋料號或品名..." style="width: 200px;">
+      <input type="text" id="search-box" oninput="filterItems()" placeholder="搜尋料號或品名..." style="width: 200px;">
     </div>
     <table>
       <thead>
@@ -101,5 +101,73 @@
 
     let itemList = [];
 
-    // 通用 HTTP 請求函式
-    async
+    // HTTP 請求封裝
+    async function apiRequest(endpoint, method = 'GET', body = null) {
+      const headers = {
+        'apikey': API_KEY,
+        'Authorization': 'Bearer ' + API_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': method === 'POST' ? 'return=representation' : 'count=none'
+      };
+
+      const options = { method, headers };
+      if (body) options.body = JSON.stringify(body);
+
+      const res = await fetch(API_URL + endpoint, options);
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`[HTTP ${res.status}]${errText}`);
+      }
+
+      if (res.status === 204) return null;
+      return await res.json();
+    }
+
+    // 載入資料
+    async function loadData() {
+      const tb = document.getElementById('tb');
+      const statusText = document.getElementById('status-text');
+      try {
+        tb.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 25px; color: #94a3b8;">正在向雲端資料庫讀取資料...</td></tr>';
+        
+        const items = await apiRequest('/items?select=*&order=id.desc');
+        itemList = items || [];
+        renderTable(itemList);
+
+        const logs = await apiRequest('/logs?select=*&order=created_at.desc&limit=15');
+        renderLogs(logs || []);
+
+        statusText.innerText = '● 雲端連線正常';
+        statusText.style.color = '#16a34a';
+      } catch (err) {
+        statusText.innerText = '● 連線失敗';
+        statusText.style.color = '#dc2626';
+        tb.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 25px; color: #dc2626; font-weight: bold;">讀取失敗：${err.message}</td></tr>`;
+      }
+    }
+
+    // 渲染表格
+    function renderTable(data) {
+      const tb = document.getElementById('tb');
+      const sel = document.getElementById('op-sku');
+
+      sel.innerHTML = '<option value="">-- 請先選擇料號 --</option>';
+      itemList.forEach(item => {
+        sel.innerHTML += `<option value="${item.sku}">${item.sku} - ${item.name} (在庫: ${item.stock})</option>`;
+      });
+
+      if (!data || data.length === 0) {
+        tb.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 25px; color: #64748b;">目前資料庫尚無品項，請在上方區塊 1 新增料號。</td></tr>';
+        return;
+      }
+
+      tb.innerHTML = data.map(item => {
+        const isLow = item.stock <= item.min_stock;
+        return `
+          <tr>
+            <td style="font-weight: bold; font-family: monospace;">${item.sku}</td>
+            <td>${item.name}</td>
+            <td style="color: #64748b;">${item.min_stock}</td>
+            <td><span class="tag ${isLow ? 'tag-low' : 'tag-ok'}">${item.stock}</span></td>
+            <td style="text-align: right;">
+              <button class="btn btn-gray" style="padding: 4px 10px; font-size: 12px;"
