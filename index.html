@@ -2,51 +2,54 @@
 <html lang="zh-TW">
 <head>
   <meta charset="utf-8">
-  <title>雲端庫存系統</title>
+  <title>雲端即時庫存管理系統</title>
   <style>
-    body { font-family: sans-serif; background: #f1f5f9; padding: 20px; color: #1e293b; max-width: 1000px; margin: 0 auto; }
-    .box { background: #fff; padding: 16px; border-radius: 8px; border: 1px solid #cbd5e1; margin-bottom: 16px; }
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f1f5f9; padding: 20px; color: #1e293b; max-width: 1000px; margin: 0 auto; }
+    .box { background: #fff; padding: 18px; border-radius: 8px; border: 1px solid #cbd5e1; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
     h2, h3 { margin-top: 0; color: #0f172a; }
-    .btn { padding: 8px 16px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
-    .btn-blue { background: #3b82f6; color: #fff; }
-    .btn-green { background: #10b981; color: #fff; }
+    .btn { padding: 9px 16px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; transition: 0.15s; }
+    .btn:hover { opacity: 0.9; }
+    .btn-blue { background: #2563eb; color: #fff; }
+    .btn-green { background: #16a34a; color: #fff; }
     .btn-gray { background: #64748b; color: #fff; }
     .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-    input, select { padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 14px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th, td { padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: left; font-size: 14px; }
+    input, select { padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; outline: none; }
+    input:focus, select:focus { border-color: #2563eb; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+    th, td { padding: 12px 10px; border-bottom: 1px solid #e2e8f0; text-align: left; }
     th { background: #f8fafc; color: #475569; }
     .tag { padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px; }
-    .tag-low { background: #fee2e2; color: #dc2626; }
+    .tag-low { background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; }
     .tag-ok { background: #f1f5f9; color: #334155; }
   </style>
 </head>
 <body>
 
-  <!-- 頂部標題 -->
-  <div class="box" style="display: flex; justify-content: space-between; align-items: center;">
+  <!-- 頂部標題與狀態 -->
+  <div class="box" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
     <div>
       <h2 style="margin: 0;">雲端即時庫存管理系統</h2>
-      <div id="status-text" style="font-size: 13px; color: #16a34a; font-weight: bold; margin-top: 4px;">連線準備就緒</div>
+      <div id="status-text" style="font-size: 13px; color: #16a34a; font-weight: bold; margin-top: 4px;">● 系統就緒</div>
     </div>
-    <button class="btn btn-gray" onclick="loadData()">重新整理資料</button>
+    <button class="btn btn-gray" id="btn-refresh">重新整理資料</button>
   </div>
 
-  <!-- 區塊 1：直接陳列的新增料號表單（永遠顯示，免展開） -->
-  <div class="box" style="border-left: 4px solid #3b82f6;">
-    <h3 style="color: #1d4ed8; margin-bottom: 10px;">1. 新增品項料號</h3>
+  <!-- 區塊 1：新增料號表單 -->
+  <div class="box" style="border-left: 4px solid #2563eb;">
+    <h3 style="color: #1d4ed8; margin-bottom: 12px;">1. 新增品項料號主檔</h3>
     <div class="row">
       <input type="text" id="add-sku" placeholder="料號 (例: P-1001)">
-      <input type="text" id="add-name" placeholder="品名規格 (例: 馬達 24V)">
+      <input type="text" id="add-name" placeholder="品名規格 (例: 滾珠軸承)">
       <input type="number" id="add-stock" placeholder="初始庫存" value="0" style="width: 100px;">
-      <input type="number" id="add-min" placeholder="安全水位" value="10" style="width: 100px;">
-      <button class="btn btn-blue" id="btn-save" onclick="saveItem()">儲存此品項</button>
+      <input type="number" id="add-min" placeholder="安全庫存" value="10" style="width: 100px;">
+      <button class="btn btn-blue" id="btn-save">儲存此品項</button>
     </div>
   </div>
 
-  <!-- 區塊 2：直接陳列的出入庫登記表單（永遠顯示，免展開） -->
-  <div class="box" style="border-left: 4px solid #10b981;">
-    <h3 style="color: #047857; margin-bottom: 10px;">2. 進出庫作業登記</h3>
+  <!-- 區塊 2：出入庫登記表單 -->
+  <div class="box" style="border-left: 4px solid #16a34a;">
+    <h3 style="color: #15803d; margin-bottom: 12px;">2. 進出庫作業登記</h3>
     <div class="row">
       <select id="op-sku">
         <option value="">-- 請先選擇料號 --</option>
@@ -56,52 +59,47 @@
         <option value="OUT">領料出庫 (-)</option>
       </select>
       <input type="number" id="op-qty" placeholder="數量" value="1" min="1" style="width: 80px;">
-      <input type="text" id="op-user" placeholder="經辦人" value="現場人員" style="width: 100px;">
-      <input type="text" id="op-note" placeholder="工單 / 備註">
-      <button class="btn btn-green" id="btn-exec" onclick="execStock()">確認執行</button>
+      <input type="text" id="op-user" placeholder="經辦人" value="現場人員" style="width: 110px;">
+      <input type="text" id="op-note" placeholder="工單 / 備註單號">
+      <button class="btn btn-green" id="btn-exec">確認執行</button>
     </div>
   </div>
 
   <!-- 區塊 3：在庫清單 -->
   <div class="box">
-    <h3>3. 在庫清單</h3>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+      <h3 style="margin: 0;">3. 在庫清單</h3>
+      <input type="text" id="search-box" placeholder="搜尋料號或品名..." style="width: 200px;">
+    </div>
     <table>
       <thead>
         <tr>
-          <th>料號</th>
+          <th>料號 (SKU)</th>
           <th>品名</th>
           <th>安全水位</th>
           <th>目前庫存</th>
-          <th>操作</th>
+          <th style="text-align: right;">快速操作</th>
         </tr>
       </thead>
       <tbody id="tb">
-        <tr><td colspan="5" style="text-align:center; padding: 20px; color: #94a3b8;">讀取中...</td></tr>
+        <tr><td colspan="5" style="text-align:center; padding: 25px; color: #94a3b8;">正在讀取資料...</td></tr>
       </tbody>
     </table>
   </div>
 
   <!-- 區塊 4：異動日誌 -->
   <div class="box">
-    <h3>4. 最新出入庫紀錄</h3>
+    <h3 style="margin-bottom: 10px;">4. 最新出入庫紀錄</h3>
     <div id="logs" style="font-size: 13px; line-height: 1.8; color: #475569;">
-      尚無紀錄
+      尚無異動紀錄
     </div>
   </div>
 
   <script>
-    var URL = "https://xbqzrabsbtovupkchpnz.supabase.co/rest/v1";
-    var KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhicXpyYWJzYnRvdnVwa2NocG56Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3Nzg3NjAsImV4cCI6MjEwNzM1NDc2MH0.qu07loPPlctnSmeRUPDc8Km9ISWjBr7redwRWjto1Fc";
+    const API_URL = "https://xbqzrabsbtovupkchpnz.supabase.co/rest/v1";
+    const API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhicXpyYWJzYnRvdnVwa2NocG56Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3Nzg3NjAsImV4cCI6MjEwNzM1NDc2MH0.qu07loPPlctnSmeRUPDc8Km9ISWjBr7redwRWjto1Fc";
 
-    var itemList = [];
+    let itemList = [];
 
-    // 載入資料
-    function loadData() {
-      fetch(URL + '/items?select=*&order=id.desc', {
-        headers: { 'apikey': KEY, 'Authorization': 'Bearer ' + KEY }
-      })
-      .then(function(res) { return res.json(); })
-      .then(function(data) {
-        itemList = data || [];
-        renderTable();
-      })
+    // 通用 HTTP 請求函式
+    async
